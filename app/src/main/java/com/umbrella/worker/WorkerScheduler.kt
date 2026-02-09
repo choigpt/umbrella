@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import java.util.Calendar
@@ -109,6 +110,23 @@ class WorkerScheduler @Inject constructor(
         )
 
         Log.d(TAG, "Morning check scheduled, delay=${delay}ms")
+    }
+
+    /**
+     * 즉시 날씨 확인 실행 (설정 변경 시 호출)
+     */
+    fun runImmediateWeatherCheck() {
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val workRequest = OneTimeWorkRequestBuilder<WeatherCheckWorker>()
+            .setConstraints(constraints)
+            .addTag(WeatherCheckWorker.TAG)
+            .build()
+
+        workManager.enqueue(workRequest)
+        Log.d(TAG, "Immediate weather check enqueued")
     }
 
     /**

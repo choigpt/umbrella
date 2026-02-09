@@ -19,8 +19,7 @@ object WeatherMapper {
     fun mapToTomorrowForecast(response: WeatherResponse): DailyForecast {
         val now = Clock.System.now()
         val today = now.toLocalDateTime(TimeZone.of("Asia/Seoul")).date
-        val tomorrow = LocalDate(today.year, today.monthNumber, today.dayOfMonth)
-            .let { LocalDate(it.year, it.monthNumber, it.dayOfMonth + 1) }
+        val tomorrow = LocalDate.fromEpochDays(today.toEpochDays() + 1)
 
         val hourlyForecasts = mutableListOf<HourlyForecast>()
 

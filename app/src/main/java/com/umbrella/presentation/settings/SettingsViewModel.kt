@@ -8,6 +8,7 @@ import com.umbrella.data.scheduler.NotificationScheduler
 import com.umbrella.domain.model.KoreanCities
 import com.umbrella.domain.model.ManualLocation
 import com.umbrella.domain.model.UserSettings
+import com.umbrella.domain.usecase.RefreshWeatherUseCase
 import com.umbrella.util.BatteryOptimizationHelper
 import com.umbrella.worker.WorkerScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,7 +27,8 @@ class SettingsViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
     private val workerScheduler: WorkerScheduler,
     private val notificationScheduler: NotificationScheduler,
-    private val batteryOptimizationHelper: BatteryOptimizationHelper
+    private val batteryOptimizationHelper: BatteryOptimizationHelper,
+    private val refreshWeatherUseCase: RefreshWeatherUseCase
 ) : ViewModel() {
 
     private val _batteryOptimizationIgnored = MutableStateFlow(
@@ -69,12 +71,16 @@ class SettingsViewModel @Inject constructor(
             preferencesRepository.updateNotificationTime(LocalTime(hour, minute))
             // Worker 재스케줄링
             workerScheduler.schedulePeriodicWeatherCheck()
+            // 즉시 날씨 확인 + 알림 예약 (WorkManager 우회, 바로 실행)
+            refreshWeatherUseCase()
         }
     }
 
     fun updatePopThreshold(threshold: Int) {
         viewModelScope.launch {
             preferencesRepository.updatePopThreshold(threshold)
+            // 임계치 변경 시 즉시 날씨 재확인 + 알림 재예약
+            refreshWeatherUseCase()
         }
     }
 

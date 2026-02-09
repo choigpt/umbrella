@@ -54,7 +54,7 @@ class AlarmSchedulerImpl @Inject constructor(
     // ==================== Public API ====================
 
     override suspend fun scheduleNotification(time: LocalTime, pop: Int): AlarmScheduleResult {
-        val targetMillis = calculateTomorrowTimeMillis(time)
+        val targetMillis = calculateNextTimeMillis(time)
         return scheduleAlarmWithResult(targetMillis, pop)
     }
 
@@ -338,15 +338,25 @@ class AlarmSchedulerImpl @Inject constructor(
         }
     }
 
-    private fun calculateTomorrowTimeMillis(time: LocalTime): Long {
+    private fun calculateNextTimeMillis(time: LocalTime): Long {
         val now = Clock.System.now()
         val tz = TimeZone.of("Asia/Seoul")
-        val today = now.toLocalDateTime(tz).date
+        val todayDateTime = now.toLocalDateTime(tz)
+        val today = todayDateTime.date
 
-        val tomorrow = kotlinx.datetime.LocalDate.fromEpochDays(today.toEpochDays() + 1)
-        val targetDateTime = time.atDate(tomorrow)
+        // 오늘 해당 시간이 아직 안 지났으면 오늘, 지났으면 내일
+        val targetDateTime = time.atDate(today)
+        val targetMillis = targetDateTime.toInstant(tz).toEpochMilliseconds()
+        val nowMillis = now.toEpochMilliseconds()
 
-        return targetDateTime.toInstant(tz).toEpochMilliseconds()
+        return if (targetMillis > nowMillis) {
+            // 오늘 시간이 아직 안 지났으면 오늘로 예약
+            targetMillis
+        } else {
+            // 이미 지났으면 내일로 예약
+            val tomorrow = kotlinx.datetime.LocalDate.fromEpochDays(today.toEpochDays() + 1)
+            time.atDate(tomorrow).toInstant(tz).toEpochMilliseconds()
+        }
     }
 
     private fun createPendingIntent(pop: Int): PendingIntent {

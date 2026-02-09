@@ -88,7 +88,7 @@ class PreferencesRepository @Inject constructor(
 
         // 새로운 키 우선, 없으면 레거시 키 사용
         val targetTimeMillis = prefs[UserPreferences.SCHEDULED_ALARM_TARGET_TIME]
-            ?: prefs[UserPreferences.SCHEDULED_ALARM_TIME]
+            ?: @Suppress("DEPRECATION") prefs[UserPreferences.SCHEDULED_ALARM_TIME]
 
         val timeMinutes = prefs[UserPreferences.NOTIFICATION_TIME_MINUTES] ?: (7 * 60 + 30)
         val notificationTime = LocalTime(timeMinutes / 60, timeMinutes % 60)
@@ -319,7 +319,7 @@ class PreferencesRepository @Inject constructor(
         sb.appendLine("[알림 설정]")
         val timeMinutes = prefs[UserPreferences.NOTIFICATION_TIME_MINUTES] ?: (7 * 60 + 30)
         sb.appendLine("알림 시간: ${timeMinutes / 60}:${(timeMinutes % 60).toString().padStart(2, '0')}")
-        sb.appendLine("임계치: ${prefs[UserPreferences.POP_THRESHOLD] ?: 30}%")
+        sb.appendLine("임계치: ${prefs[UserPreferences.POP_THRESHOLD] ?: 40}%")
         sb.appendLine("활성화: ${prefs[UserPreferences.IS_ENABLED] ?: true}")
         sb.appendLine()
 

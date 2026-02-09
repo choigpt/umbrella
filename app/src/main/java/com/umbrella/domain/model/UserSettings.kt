@@ -24,12 +24,12 @@ data class UserSettings(
         val DEFAULT_NOTIFICATION_TIME = LocalTime(7, 30)
         const val DEFAULT_POP_THRESHOLD = 40
 
-        const val MIN_THRESHOLD = 20
+        const val MIN_THRESHOLD = 0
         const val MAX_THRESHOLD = 80
         const val THRESHOLD_STEP = 10
 
-        val MIN_NOTIFICATION_TIME = LocalTime(5, 0)
-        val MAX_NOTIFICATION_TIME = LocalTime(9, 0)
+        val MIN_NOTIFICATION_TIME = LocalTime(0, 0)
+        val MAX_NOTIFICATION_TIME = LocalTime(23, 59)
     }
 }
 

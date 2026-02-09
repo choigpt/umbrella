@@ -18,15 +18,24 @@ data class StatusInfo(
     val cacheAge: String? = null,
     val errorMessage: String? = null
 ) {
+    private fun formatTime(time: LocalTime?): String {
+        if (time == null) return "07:30"
+        val hour = time.hour
+        val minute = time.minute.toString().padStart(2, '0')
+        val amPm = if (hour < 12) "오전" else "오후"
+        val displayHour = if (hour == 0) 12 else if (hour > 12) hour - 12 else hour
+        return "$amPm ${displayHour}:${minute}"
+    }
+
     /**
      * 사용자에게 표시할 메인 메시지
      */
     val userMessage: String
         get() = when (status) {
             AppStatus.SCHEDULED_EXACT,
-            AppStatus.SCHEDULED_APPROXIMATE -> "내일 알림 예약됨"
+            AppStatus.SCHEDULED_APPROXIMATE -> "알림 예약됨"
 
-            AppStatus.NO_RAIN_EXPECTED -> "내일은 맑음"
+            AppStatus.NO_RAIN_EXPECTED -> "비 소식 없음"
 
             AppStatus.FETCH_FAILED_NETWORK -> "날씨 정보 조회 실패"
             AppStatus.FETCH_FAILED_LOCATION -> "위치를 가져올 수 없음"
@@ -48,13 +57,11 @@ data class StatusInfo(
     val detailMessage: String?
         get() = when (status) {
             AppStatus.SCHEDULED_EXACT -> {
-                val timeStr = scheduledTime?.toString() ?: "07:30"
-                "오전 ${timeStr}에 알림이 울립니다 (강수확률 ${pop ?: 0}%)"
+                "${formatTime(scheduledTime)}에 알림이 울립니다 (강수확률 ${pop ?: 0}%)"
             }
 
             AppStatus.SCHEDULED_APPROXIMATE -> {
-                val timeStr = scheduledTime?.toString() ?: "07:30"
-                "오전 ${timeStr} 전후로 알림이 울립니다 (±15분 오차 가능)"
+                "${formatTime(scheduledTime)} 전후로 알림이 울립니다 (±15분 오차 가능)"
             }
 
             AppStatus.NO_RAIN_EXPECTED -> {

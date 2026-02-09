@@ -7,6 +7,7 @@ import android.util.Log
 import com.umbrella.data.prefs.PreferencesRepository
 import com.umbrella.data.scheduler.AlarmSchedulerImpl
 import com.umbrella.notification.NotificationHelper
+import com.umbrella.presentation.alert.AlarmAlertActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,9 +40,11 @@ class AlarmReceiver : BroadcastReceiver() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d(TAG, "Alarm received: action=${intent.action}")
+        val receivedAt = System.currentTimeMillis()
+        Log.d(TAG, "Alarm received: action=${intent.action}, time=$receivedAt")
 
         val pop = intent.getIntExtra(AlarmSchedulerImpl.EXTRA_POP, 0)
+        Log.d(TAG, "  pop=$pop")
 
         // 비동기 작업을 위해 pendingResult 사용
         val pendingResult = goAsync()
@@ -54,18 +57,24 @@ class AlarmReceiver : BroadcastReceiver() {
                     return@launch
                 }
 
+                // TODO: 테스트 완료 후 복구할 것
                 // 2. 오늘 이미 알림을 표시했는지 확인
-                if (preferencesRepository.hasNotifiedToday()) {
-                    Log.d(TAG, "Already notified today, skipping duplicate")
-                    return@launch
-                }
+                // if (preferencesRepository.hasNotifiedToday()) {
+                //     Log.d(TAG, "Already notified today, skipping duplicate")
+                //     return@launch
+                // }
 
                 // 3. 알림 표시
-                notificationHelper.showRainNotification(pop)
-                Log.d(TAG, "Rain notification shown: pop=$pop")
+                val shown = notificationHelper.showRainNotification(pop)
+                Log.d(TAG, "Rain notification shown=$shown, pop=$pop")
 
-                // 4. 알림 표시 기록
-                preferencesRepository.markNotificationShown()
+                // 3-1. 풀스크린 Alert 화면 표시
+                launchAlertActivity(context, pop)
+
+                // 4. 알림 실제로 표시된 경우에만 기록
+                if (shown) {
+                    preferencesRepository.markNotificationShown()
+                }
 
                 // 5. 예약 정보 정리
                 preferencesRepository.clearScheduledAlarm()
@@ -77,6 +86,19 @@ class AlarmReceiver : BroadcastReceiver() {
         }.invokeOnCompletion {
             // coroutine이 취소되거나 완료되면 항상 finish() 호출
             pendingResult.finish()
+        }
+    }
+
+    private fun launchAlertActivity(context: Context, pop: Int) {
+        try {
+            val alertIntent = Intent(context, AlarmAlertActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                putExtra(AlarmAlertActivity.EXTRA_POP, pop)
+            }
+            context.startActivity(alertIntent)
+            Log.d(TAG, "AlarmAlertActivity launched: pop=$pop")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to launch AlarmAlertActivity", e)
         }
     }
 }

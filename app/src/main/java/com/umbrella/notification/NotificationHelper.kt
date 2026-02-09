@@ -57,9 +57,9 @@ class NotificationHelper @Inject constructor(
     /**
      * 비 알림 표시
      */
-    fun showRainNotification(pop: Int) {
+    fun showRainNotification(pop: Int): Boolean {
         if (!hasNotificationPermission()) {
-            return
+            return false
         }
 
         val intent = Intent(context, MainActivity::class.java).apply {
@@ -84,6 +84,7 @@ class NotificationHelper @Inject constructor(
             .build()
 
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
+        return true
     }
 
     /**

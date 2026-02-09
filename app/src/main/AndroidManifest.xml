@@ -43,6 +43,13 @@
             </intent-filter>
         </activity>
 
+        <!-- 풀스크린 비 알림 화면 -->
+        <activity
+            android:name=".presentation.alert.AlarmAlertActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:theme="@style/Theme.Umbrella.Alert" />
+
         <!-- Alarm Receiver (내부 전용) -->
         <receiver
             android:name=".receiver.AlarmReceiver"

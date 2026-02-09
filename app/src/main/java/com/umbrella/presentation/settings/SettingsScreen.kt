@@ -356,24 +356,12 @@ fun TimePickerDialog(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 TimePicker(state = timePickerState)
-                Text(
-                    "오전 5시 ~ 9시 사이로 설정하세요",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
-                    val hour = timePickerState.hour
-                    val minute = timePickerState.minute
-                    // 시간 범위 검증 (05:00 ~ 09:00)
-                    if (hour in 5..9) {
-                        onConfirm(hour, minute)
-                    } else {
-                        onConfirm(7, 30) // 범위 밖이면 기본값
-                    }
+                    onConfirm(timePickerState.hour, timePickerState.minute)
                 }
             ) {
                 Text("확인")

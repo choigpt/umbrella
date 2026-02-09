@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Umbrella MVP - 위치 기반 비 예보 알림 앱\n\n주요 기능:\n- Open-Meteo API 기반 날씨 예보 조회\n- 강수확률 임계치 초과 시 로컬 알림 예약\n- AlarmManager Exact/Inexact 하이브리드 스케줄링\n- WorkManager 기반 주기적 예보 갱신 \\(저녁/새벽\\)\n- 재부팅/시간변경 시 알람 자동 복구\n- 위치 fallback: GPS → 캐시 → 수동 도시\n- 배터리 최적화 안내 및 권한 관리 UI\n\n기술 스택:\n- Kotlin + Jetpack Compose\n- Hilt \\(DI\\)\n- DataStore \\(Preferences\\)\n- WorkManager + AlarmManager\n- kotlinx-datetime\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(cmd /c \"gradlew.bat testDebugUnitTest --tests com.umbrella.presentation.alert.AlarmAlertActivityTest 2>&1\")",
+      "Bash(cmd /c \"gradlew.bat testDebugUnitTest --tests com.umbrella.presentation.alert.AlarmAlertActivityTest\")",
+      "Bash(cmd /c \"gradlew.bat testDebugUnitTest --tests com.umbrella.presentation.alert.AlarmAlertActivityTest --info\")",
+      "Bash(cmd //c \"gradlew.bat testDebugUnitTest --tests com.umbrella.presentation.alert.AlarmAlertActivityTest 2>&1\")",
+      "Bash(./gradlew testDebugUnitTest:*)",
+      "Bash(./gradlew assembleDebug:*)"
+    ]
+  }
+}
