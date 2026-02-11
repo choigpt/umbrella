@@ -56,6 +56,10 @@ class TimeChangeReceiver : BroadcastReceiver() {
                     val restored = alarmScheduler.restoreAlarmIfNeeded()
                     Log.d(TAG, "Alarm restore after time change: $restored")
 
+                    // 사전확인 알람 복구
+                    val preCheckRestored = alarmScheduler.restorePreCheckAlarmIfNeeded()
+                    Log.d(TAG, "Pre-check alarm restore after time change: $preCheckRestored")
+
                 } catch (e: Exception) {
                     Log.e(TAG, "Error handling time change", e)
                 }

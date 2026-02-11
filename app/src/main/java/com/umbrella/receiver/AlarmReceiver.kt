@@ -6,6 +6,7 @@ import android.content.Intent
 import android.util.Log
 import com.umbrella.data.prefs.PreferencesRepository
 import com.umbrella.data.scheduler.AlarmSchedulerImpl
+import com.umbrella.domain.model.PrecipitationType
 import com.umbrella.notification.NotificationHelper
 import com.umbrella.presentation.alert.AlarmAlertActivity
 import dagger.hilt.android.AndroidEntryPoint
@@ -44,7 +45,13 @@ class AlarmReceiver : BroadcastReceiver() {
         Log.d(TAG, "Alarm received: action=${intent.action}, time=$receivedAt")
 
         val pop = intent.getIntExtra(AlarmSchedulerImpl.EXTRA_POP, 0)
-        Log.d(TAG, "  pop=$pop")
+        val precipTypeName = intent.getStringExtra(AlarmSchedulerImpl.EXTRA_PRECIP_TYPE)
+        val precipType = try {
+            precipTypeName?.let { PrecipitationType.valueOf(it) } ?: PrecipitationType.RAIN
+        } catch (_: IllegalArgumentException) {
+            PrecipitationType.RAIN
+        }
+        Log.d(TAG, "  pop=$pop, precipType=$precipType")
 
         // 비동기 작업을 위해 pendingResult 사용
         val pendingResult = goAsync()
@@ -65,11 +72,11 @@ class AlarmReceiver : BroadcastReceiver() {
                 // }
 
                 // 3. 알림 표시
-                val shown = notificationHelper.showRainNotification(pop)
-                Log.d(TAG, "Rain notification shown=$shown, pop=$pop")
+                val shown = notificationHelper.showRainNotification(pop, precipType)
+                Log.d(TAG, "Rain notification shown=$shown, pop=$pop, precipType=$precipType")
 
                 // 3-1. 풀스크린 Alert 화면 표시
-                launchAlertActivity(context, pop)
+                launchAlertActivity(context, pop, precipType)
 
                 // 4. 알림 실제로 표시된 경우에만 기록
                 if (shown) {
@@ -89,14 +96,15 @@ class AlarmReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun launchAlertActivity(context: Context, pop: Int) {
+    private fun launchAlertActivity(context: Context, pop: Int, precipType: PrecipitationType) {
         try {
             val alertIntent = Intent(context, AlarmAlertActivity::class.java).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 putExtra(AlarmAlertActivity.EXTRA_POP, pop)
+                putExtra(AlarmAlertActivity.EXTRA_PRECIP_TYPE, precipType.name)
             }
             context.startActivity(alertIntent)
-            Log.d(TAG, "AlarmAlertActivity launched: pop=$pop")
+            Log.d(TAG, "AlarmAlertActivity launched: pop=$pop, precipType=$precipType")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to launch AlarmAlertActivity", e)
         }

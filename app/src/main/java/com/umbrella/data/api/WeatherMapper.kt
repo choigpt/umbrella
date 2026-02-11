@@ -15,19 +15,33 @@ object WeatherMapper {
 
     /**
      * WeatherResponse -> 내일 DailyForecast
+     * (하위 호환: 기존 호출자는 그대로 동작)
      */
     fun mapToTomorrowForecast(response: WeatherResponse): DailyForecast {
         val now = Clock.System.now()
         val today = now.toLocalDateTime(TimeZone.of("Asia/Seoul")).date
         val tomorrow = LocalDate.fromEpochDays(today.toEpochDays() + 1)
+        return mapToForecast(response, tomorrow)
+    }
 
+    /**
+     * WeatherResponse -> 알림 대상 날짜의 DailyForecast
+     *
+     * 알림시간 기준:
+     * - 자정~알림시간: "오늘" 예보 확인 (알림 당일)
+     * - 알림시간 이후: "내일" 예보 확인 (다음 날)
+     *
+     * @param targetDate 확인할 날짜
+     */
+    fun mapToForecast(response: WeatherResponse, targetDate: LocalDate): DailyForecast {
+        val now = Clock.System.now()
         val hourlyForecasts = mutableListOf<HourlyForecast>()
 
         response.hourly.time.forEachIndexed { index, timeString ->
             val dateTime = parseDateTime(timeString) ?: return@forEachIndexed
 
-            // 내일 데이터만 필터링
-            if (dateTime.date != tomorrow) return@forEachIndexed
+            // 대상 날짜 데이터만 필터링
+            if (dateTime.date != targetDate) return@forEachIndexed
 
             val pop = response.hourly.precipitationProbability.getOrNull(index) ?: 0
             val temp = response.hourly.temperature2m?.getOrNull(index)
@@ -44,7 +58,7 @@ object WeatherMapper {
         }
 
         return DailyForecast(
-            date = tomorrow,
+            date = targetDate,
             hourlyForecasts = hourlyForecasts,
             fetchedAt = now
         )

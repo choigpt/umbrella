@@ -7,9 +7,11 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.umbrella.data.prefs.PreferencesRepository
+import com.umbrella.domain.model.PrecipitationType
 import com.umbrella.receiver.AlarmReceiver
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import kotlinx.datetime.Clock
 import kotlinx.datetime.LocalTime
@@ -40,6 +42,12 @@ class AlarmSchedulerImpl @Inject constructor(
         private const val TAG = "AlarmSchedulerImpl"
         private const val ALARM_REQUEST_CODE = 1001
         const val EXTRA_POP = "extra_pop"
+        const val EXTRA_PRECIP_TYPE = "extra_precip_type"
+
+        // 사전확인 알람
+        private const val PRE_CHECK_REQUEST_CODE = 1002
+        const val ACTION_WEATHER_PRE_CHECK = "com.umbrella.ACTION_WEATHER_PRE_CHECK"
+        const val PRE_CHECK_OFFSET_MINUTES = 60
 
         /**
          * Inexact 알람 버퍼 (분)
@@ -53,20 +61,28 @@ class AlarmSchedulerImpl @Inject constructor(
 
     // ==================== Public API ====================
 
-    override suspend fun scheduleNotification(time: LocalTime, pop: Int): AlarmScheduleResult {
+    override suspend fun scheduleNotification(
+        time: LocalTime,
+        pop: Int,
+        precipitationType: PrecipitationType
+    ): AlarmScheduleResult {
         val targetMillis = calculateNextTimeMillis(time)
-        return scheduleAlarmWithResult(targetMillis, pop)
+        return scheduleAlarmWithResult(targetMillis, pop, precipitationType)
     }
 
     /**
      * 특정 시간(epoch millis)에 알람 예약 - 재부팅 후 복구용
      */
-    suspend fun scheduleAlarmAt(targetMillis: Long, pop: Int): AlarmScheduleResult {
-        return scheduleAlarmWithResult(targetMillis, pop)
+    suspend fun scheduleAlarmAt(
+        targetMillis: Long,
+        pop: Int,
+        precipitationType: PrecipitationType = PrecipitationType.RAIN
+    ): AlarmScheduleResult {
+        return scheduleAlarmWithResult(targetMillis, pop, precipitationType)
     }
 
     override suspend fun cancelScheduledNotification() {
-        val pendingIntent = createPendingIntent(0)
+        val pendingIntent = createPendingIntent(0, PrecipitationType.RAIN)
         alarmManager.cancel(pendingIntent)
         preferencesRepository.clearScheduledAlarm()
         Log.d(TAG, "Alarm cancelled and DataStore cleared")
@@ -108,7 +124,8 @@ class AlarmSchedulerImpl @Inject constructor(
         }
 
         // 알람 재등록 (저장된 정보 기반으로 다시 스케줄링)
-        val result = scheduleAlarmWithResult(savedInfo.targetTimeMillis, savedInfo.pop)
+        val precipType = preferencesRepository.getScheduledPrecipType()
+        val result = scheduleAlarmWithResult(savedInfo.targetTimeMillis, savedInfo.pop, precipType)
         when (result) {
             is AlarmScheduleResult.Success -> {
                 Log.d(TAG, "Alarm restored: ${result.info.toDiagnosticString()}")
@@ -135,7 +152,8 @@ class AlarmSchedulerImpl @Inject constructor(
      */
     private suspend fun scheduleAlarmWithResult(
         targetMillis: Long,
-        pop: Int
+        pop: Int,
+        precipitationType: PrecipitationType = PrecipitationType.RAIN
     ): AlarmScheduleResult = withContext(Dispatchers.IO) {
 
         // 1. 시간 유효성 검증
@@ -145,7 +163,7 @@ class AlarmSchedulerImpl @Inject constructor(
             return@withContext AlarmScheduleResult.Failure(FailureReason.INVALID_TIME)
         }
 
-        val pendingIntent = createPendingIntent(pop)
+        val pendingIntent = createPendingIntent(pop, precipitationType)
 
         // 기존 알람 취소
         alarmManager.cancel(pendingIntent)
@@ -166,6 +184,7 @@ class AlarmSchedulerImpl @Inject constructor(
 
                 // 3. DataStore에 실제 결과 저장
                 preferencesRepository.saveScheduledAlarm(info)
+                preferencesRepository.saveScheduledPrecipType(precipitationType)
 
                 Log.d(TAG, "Alarm scheduled successfully:\n${info.toDiagnosticString()}")
                 AlarmScheduleResult.Success(info)
@@ -359,10 +378,11 @@ class AlarmSchedulerImpl @Inject constructor(
         }
     }
 
-    private fun createPendingIntent(pop: Int): PendingIntent {
+    private fun createPendingIntent(pop: Int, precipitationType: PrecipitationType): PendingIntent {
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = "com.umbrella.ACTION_RAIN_ALARM"
             putExtra(EXTRA_POP, pop)
+            putExtra(EXTRA_PRECIP_TYPE, precipitationType.name)
         }
 
         val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -377,6 +397,161 @@ class AlarmSchedulerImpl @Inject constructor(
             intent,
             flags
         )
+    }
+
+    // ==================== Pre-Check Alarm (사전확인) ====================
+
+    /**
+     * 사전확인 알람 예약 - 알림시간 60분 전에 날씨 체크
+     * @param notificationTime 알림 시간
+     * @return 예약 성공 여부
+     */
+    suspend fun schedulePreCheckAlarm(notificationTime: LocalTime): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val preCheckMillis = calculatePreCheckTimeMillis(notificationTime)
+            val now = Clock.System.now().toEpochMilliseconds()
+
+            if (preCheckMillis <= now) {
+                Log.d(TAG, "Pre-check time already passed, skipping")
+                return@withContext false
+            }
+
+            val pendingIntent = createPreCheckPendingIntent()
+
+            // 기존 사전확인 알람 취소
+            alarmManager.cancel(pendingIntent)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.RTC_WAKEUP,
+                    preCheckMillis,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setExact(
+                    AlarmManager.RTC_WAKEUP,
+                    preCheckMillis,
+                    pendingIntent
+                )
+            }
+
+            // DataStore에 사전확인 알람 시간 저장 (복구용)
+            preferencesRepository.savePreCheckAlarmTime(preCheckMillis)
+
+            Log.d(TAG, "Pre-check alarm scheduled at $preCheckMillis (${PRE_CHECK_OFFSET_MINUTES}min before notification)")
+            true
+        } catch (e: SecurityException) {
+            Log.w(TAG, "SecurityException scheduling pre-check, trying inexact", e)
+            try {
+                val preCheckMillis = calculatePreCheckTimeMillis(notificationTime)
+                val pendingIntent = createPreCheckPendingIntent()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    alarmManager.setAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        preCheckMillis,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.set(
+                        AlarmManager.RTC_WAKEUP,
+                        preCheckMillis,
+                        pendingIntent
+                    )
+                }
+                preferencesRepository.savePreCheckAlarmTime(preCheckMillis)
+                true
+            } catch (e2: Exception) {
+                Log.e(TAG, "Failed to schedule pre-check alarm", e2)
+                false
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to schedule pre-check alarm", e)
+            false
+        }
+    }
+
+    /**
+     * 사전확인 알람 취소
+     */
+    fun cancelPreCheckAlarm() {
+        val pendingIntent = createPreCheckPendingIntent()
+        alarmManager.cancel(pendingIntent)
+        Log.d(TAG, "Pre-check alarm cancelled")
+    }
+
+    /**
+     * 사전확인 알람 복구 (재부팅/시간변경/앱시작 시)
+     * @return 복구 성공 여부
+     */
+    suspend fun restorePreCheckAlarmIfNeeded(): Boolean = withContext(Dispatchers.IO) {
+        if (!preferencesRepository.isAppEnabled()) {
+            Log.d(TAG, "App disabled, skipping pre-check restore")
+            return@withContext false
+        }
+
+        return@withContext schedulePreCheckFromSettings()
+    }
+
+    /**
+     * 사전확인 알람 시간 계산
+     * 알림시간에서 PRE_CHECK_OFFSET_MINUTES 전
+     * wrap-around 처리: 00:30 알림 → 전날 23:30
+     */
+    private fun calculatePreCheckTimeMillis(notificationTime: LocalTime): Long {
+        val tz = TimeZone.of("Asia/Seoul")
+        val now = Clock.System.now()
+        val todayDateTime = now.toLocalDateTime(tz)
+        val today = todayDateTime.date
+
+        // 알림 시간의 다음 발생 시점 계산
+        val notifDateTime = notificationTime.atDate(today)
+        val notifMillis = notifDateTime.toInstant(tz).toEpochMilliseconds()
+        val nowMillis = now.toEpochMilliseconds()
+
+        val targetNotifMillis = if (notifMillis > nowMillis) {
+            notifMillis
+        } else {
+            val tomorrow = kotlinx.datetime.LocalDate.fromEpochDays(today.toEpochDays() + 1)
+            notificationTime.atDate(tomorrow).toInstant(tz).toEpochMilliseconds()
+        }
+
+        // 사전확인: 알림시간 - offset
+        val preCheckMillis = targetNotifMillis - (PRE_CHECK_OFFSET_MINUTES * 60 * 1000L)
+
+        // 사전확인 시간이 이미 지났으면 (알림이 매우 가까운 경우) 그냥 현재+1분
+        return if (preCheckMillis <= nowMillis) {
+            nowMillis + 60_000L
+        } else {
+            preCheckMillis
+        }
+    }
+
+    private fun createPreCheckPendingIntent(): PendingIntent {
+        val intent = Intent(ACTION_WEATHER_PRE_CHECK).apply {
+            setPackage(context.packageName)
+        }
+
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+
+        return PendingIntent.getBroadcast(
+            context,
+            PRE_CHECK_REQUEST_CODE,
+            intent,
+            flags
+        )
+    }
+
+    /**
+     * 현재 설정에서 사전확인 알람 예약
+     */
+    private suspend fun schedulePreCheckFromSettings(): Boolean {
+        val settings = preferencesRepository.settingsFlow.first()
+        if (!settings.isEnabled) return false
+        return schedulePreCheckAlarm(settings.notificationTime)
     }
 }
 

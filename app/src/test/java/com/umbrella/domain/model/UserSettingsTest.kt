@@ -42,7 +42,7 @@ class UserSettingsTest {
 
     @Test
     fun `threshold constraints are correct`() {
-        assertEquals(20, UserSettings.MIN_THRESHOLD)
+        assertEquals(0, UserSettings.MIN_THRESHOLD)
         assertEquals(80, UserSettings.MAX_THRESHOLD)
         assertEquals(10, UserSettings.THRESHOLD_STEP)
     }

@@ -19,7 +19,7 @@ class StatusInfoTest {
             lastUpdate = Clock.System.now()
         )
 
-        assertEquals("내일 알림 예약됨", status.userMessage)
+        assertEquals("알림 예약됨", status.userMessage)
         assertNotNull(status.detailMessage)
     }
 
@@ -32,7 +32,7 @@ class StatusInfoTest {
             lastUpdate = Clock.System.now()
         )
 
-        assertEquals("내일은 맑음", status.userMessage)
+        assertEquals("비 소식 없음", status.userMessage)
         assertEquals("강수확률 20%로 임계치(40%) 미만입니다", status.detailMessage)
     }
 

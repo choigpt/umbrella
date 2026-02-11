@@ -75,6 +75,16 @@
             </intent-filter>
         </receiver>
 
+        <!-- Weather Pre-Check Receiver (사전확인 알람) -->
+        <receiver
+            android:name=".receiver.WeatherCheckReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.umbrella.ACTION_WEATHER_PRE_CHECK" />
+            </intent-filter>
+        </receiver>
+
         <!-- Time Change Receiver (시간/타임존/날짜 변경) -->
         <receiver
             android:name=".receiver.TimeChangeReceiver"

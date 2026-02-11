@@ -1,5 +1,6 @@
 package com.umbrella.data.scheduler
 
+import com.umbrella.domain.model.PrecipitationType
 import kotlinx.datetime.LocalTime
 import kotlinx.datetime.toLocalDateTime
 
@@ -12,9 +13,14 @@ interface NotificationScheduler {
      * 알림 예약
      * @param time 알림 시간 (목표 시간)
      * @param pop 강수확률
+     * @param precipitationType 강수 유형
      * @return 예약 결과 (성공/실패 포함)
      */
-    suspend fun scheduleNotification(time: LocalTime, pop: Int): AlarmScheduleResult
+    suspend fun scheduleNotification(
+        time: LocalTime,
+        pop: Int,
+        precipitationType: PrecipitationType = PrecipitationType.RAIN
+    ): AlarmScheduleResult
 
     /**
      * 예약된 알림 취소

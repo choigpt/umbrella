@@ -10,6 +10,9 @@ import com.umbrella.domain.model.ErrorType
 import com.umbrella.domain.model.WeatherDecision
 import kotlinx.coroutines.flow.first
 import kotlinx.datetime.Clock
+import kotlinx.datetime.LocalDate
+import kotlinx.datetime.TimeZone
+import kotlinx.datetime.toLocalDateTime
 import javax.inject.Inject
 
 /**
@@ -39,8 +42,23 @@ class CheckWeatherUseCase @Inject constructor(
             }
         }
 
-        // 2. 날씨 조회
-        val weatherResult = weatherRepository.getTomorrowForecast(location, forceRefresh)
+        // 2. 알림 대상 날짜 결정
+        //    자정~알림시간: "오늘" (알림 당일)
+        //    알림시간 이후: "내일" (다음 날 알림 예약)
+        val settings = preferencesRepository.settingsFlow.first()
+        val tz = TimeZone.of("Asia/Seoul")
+        val nowDateTime = Clock.System.now().toLocalDateTime(tz)
+        val today = nowDateTime.date
+        val targetDate = if (nowDateTime.hour < settings.notificationTime.hour ||
+            (nowDateTime.hour == settings.notificationTime.hour && nowDateTime.minute < settings.notificationTime.minute)
+        ) {
+            today // 아직 알림시간 전 → 오늘 예보 확인
+        } else {
+            LocalDate.fromEpochDays(today.toEpochDays() + 1) // 알림시간 지남 → 내일 예보
+        }
+
+        // 3. 날씨 조회
+        val weatherResult = weatherRepository.getTomorrowForecast(location, forceRefresh, targetDate)
         val forecast = when (weatherResult) {
             is WeatherResult.Success -> weatherResult.forecast
             is WeatherResult.SuccessWithWarning -> weatherResult.forecast
@@ -54,22 +72,26 @@ class CheckWeatherUseCase @Inject constructor(
             }
         }
 
-        // 3. 설정 조회
-        val settings = preferencesRepository.settingsFlow.first()
-
         // 4. PoP 계산 (±2h 범위 내 최대값)
         val maxPop = forecast.maxPopInRange(
             startHour = settings.popCheckStartHour,
             endHour = settings.popCheckEndHour
         )
 
-        // 5. 결정
+        // 5. 강수 유형 판별
+        val precipType = forecast.dominantPrecipitationType(
+            startHour = settings.popCheckStartHour,
+            endHour = settings.popCheckEndHour
+        )
+
+        // 6. 결정
         return if (maxPop >= settings.popThreshold) {
             WeatherDecision.RainExpected(
                 maxPop = maxPop,
                 location = location,
                 notificationTime = settings.notificationTime,
-                fetchedAt = Clock.System.now()
+                fetchedAt = Clock.System.now(),
+                precipitationType = precipType
             )
         } else {
             WeatherDecision.NoRain(

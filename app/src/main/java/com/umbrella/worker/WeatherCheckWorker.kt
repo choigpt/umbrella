@@ -1,9 +1,11 @@
 package com.umbrella.worker
 
 import android.content.Context
+import android.util.Log
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.umbrella.data.scheduler.AlarmSchedulerImpl
 import com.umbrella.domain.usecase.CheckWeatherUseCase
 import com.umbrella.domain.usecase.ScheduleNotificationUseCase
 import com.umbrella.domain.model.ScheduleResult
@@ -22,12 +24,15 @@ class WeatherCheckWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted params: WorkerParameters,
     private val checkWeatherUseCase: CheckWeatherUseCase,
-    private val scheduleNotificationUseCase: ScheduleNotificationUseCase
+    private val scheduleNotificationUseCase: ScheduleNotificationUseCase,
+    private val alarmScheduler: AlarmSchedulerImpl
 ) : CoroutineWorker(context, params) {
 
     companion object {
         const val WORK_NAME_EVENING = "weather_check_evening"
         const val WORK_NAME_MORNING = "weather_check_morning"
+        const val WORK_NAME_MIDNIGHT = "weather_check_midnight"
+        const val WORK_NAME_MIDDAY = "weather_check_midday"
         const val TAG = "WeatherCheckWorker"
     }
 
@@ -37,7 +42,7 @@ class WeatherCheckWorker @AssistedInject constructor(
             val decision = checkWeatherUseCase(forceRefresh = true)
 
             // 알림 예약
-            when (scheduleNotificationUseCase(decision)) {
+            val result = when (scheduleNotificationUseCase(decision)) {
                 is ScheduleResult.Scheduled,
                 is ScheduleResult.Cancelled -> Result.success()
                 is ScheduleResult.Failed -> {
@@ -49,7 +54,23 @@ class WeatherCheckWorker @AssistedInject constructor(
                     }
                 }
             }
+
+            // 사전확인 알람 체인 유지
+            try {
+                alarmScheduler.restorePreCheckAlarmIfNeeded()
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to schedule pre-check alarm", e)
+            }
+
+            result
         } catch (e: Exception) {
+            // 실패해도 사전확인 알람 체인 유지 시도
+            try {
+                alarmScheduler.restorePreCheckAlarmIfNeeded()
+            } catch (e2: Exception) {
+                Log.e(TAG, "Failed to schedule pre-check alarm on error", e2)
+            }
+
             if (runAttemptCount < 3) {
                 Result.retry()
             } else {

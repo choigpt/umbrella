@@ -27,11 +27,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.umbrella.R
+import com.umbrella.domain.model.PrecipitationType
 
 /**
- * 풀스크린 비 알림 화면
+ * 풀스크린 강수 알림 화면
  *
- * 반투명 어두운 배경 위에 큰 우산 아이콘과 메시지를 표시.
+ * 반투명 어두운 배경 위에 큰 아이콘과 메시지를 표시.
+ * 강수 유형(비/눈/혼합)에 따라 다른 아이콘과 메시지.
  * 화면 아무 곳이나 탭하면 닫힘.
  * 잠금 화면 위에서도 표시 가능.
  */
@@ -40,6 +42,7 @@ class AlarmAlertActivity : ComponentActivity() {
     companion object {
         private const val TAG = "AlarmAlertActivity"
         const val EXTRA_POP = "extra_pop"
+        const val EXTRA_PRECIP_TYPE = "extra_precip_type"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -48,7 +51,19 @@ class AlarmAlertActivity : ComponentActivity() {
         setupLockScreenFlags()
 
         val pop = intent.getIntExtra(EXTRA_POP, 0)
-        Log.d(TAG, "Alert shown: pop=$pop")
+        val precipTypeName = intent.getStringExtra(EXTRA_PRECIP_TYPE)
+        val precipType = try {
+            precipTypeName?.let { PrecipitationType.valueOf(it) } ?: PrecipitationType.RAIN
+        } catch (_: IllegalArgumentException) {
+            PrecipitationType.RAIN
+        }
+        Log.d(TAG, "Alert shown: pop=$pop, precipType=$precipType")
+
+        val (title, subtitle, iconTint) = when (precipType) {
+            PrecipitationType.RAIN -> Triple("우산 챙기세요!", "강수확률 ${pop}%", Color.White)
+            PrecipitationType.SNOW -> Triple("눈이 와요!", "강수확률 ${pop}%", Color(0xFFADD8E6))
+            PrecipitationType.MIXED -> Triple("비/눈 소식!", "강수확률 ${pop}%", Color(0xFFB0C4DE))
+        }
 
         setContent {
             Box(
@@ -70,15 +85,15 @@ class AlarmAlertActivity : ComponentActivity() {
                 ) {
                     Icon(
                         painter = painterResource(id = R.drawable.ic_umbrella),
-                        contentDescription = "우산",
+                        contentDescription = title,
                         modifier = Modifier.size(120.dp),
-                        tint = Color.White
+                        tint = iconTint
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
 
                     Text(
-                        text = "우산 챙기세요!",
+                        text = title,
                         color = Color.White,
                         fontSize = 28.sp,
                         fontWeight = FontWeight.Bold
@@ -87,7 +102,7 @@ class AlarmAlertActivity : ComponentActivity() {
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "강수확률 ${pop}%",
+                        text = subtitle,
                         color = Color.White.copy(alpha = 0.8f),
                         fontSize = 20.sp
                     )

@@ -94,4 +94,14 @@ object UserPreferences {
 
     /** 마지막 실패 날짜 (yyyy-MM-dd) - 실패 알림 쿨다운용 */
     val LAST_FAILURE_DATE = stringPreferencesKey("last_failure_date")
+
+    // === 사전확인 알람 ===
+
+    /** 사전확인 알람 예약 시간 (epoch millis) */
+    val PRE_CHECK_ALARM_TIME = longPreferencesKey("pre_check_alarm_time")
+
+    // === 강수 유형 ===
+
+    /** 예약된 알림의 강수 유형 (PrecipitationType.name) */
+    val SCHEDULED_PRECIP_TYPE = stringPreferencesKey("scheduled_precip_type")
 }

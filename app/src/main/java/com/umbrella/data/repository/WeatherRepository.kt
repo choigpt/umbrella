@@ -5,6 +5,7 @@ import com.umbrella.data.api.WeatherMapper
 import com.umbrella.data.prefs.WeatherCache
 import com.umbrella.domain.model.DailyForecast
 import com.umbrella.domain.model.Location
+import kotlinx.datetime.LocalDate
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -18,20 +19,26 @@ class WeatherRepository @Inject constructor(
 ) {
 
     /**
-     * 내일 날씨 예보 조회
+     * 날씨 예보 조회
      *
      * @param location 위치
      * @param forceRefresh true면 캐시 무시하고 새로 조회
+     * @param targetDate 예보 대상 날짜 (null이면 내일)
      * @return 성공 시 예보 데이터, 실패 시 캐시 데이터 또는 예외
      */
     suspend fun getTomorrowForecast(
         location: Location,
-        forceRefresh: Boolean = false
+        forceRefresh: Boolean = false,
+        targetDate: LocalDate? = null
     ): WeatherResult {
         // 캐시 확인 (forceRefresh가 아닐 때만)
         if (!forceRefresh) {
             cache.getValidCache()?.let { cacheResult ->
-                val forecast = WeatherMapper.mapToTomorrowForecast(cacheResult.response)
+                val forecast = if (targetDate != null) {
+                    WeatherMapper.mapToForecast(cacheResult.response, targetDate)
+                } else {
+                    WeatherMapper.mapToTomorrowForecast(cacheResult.response)
+                }
                 return WeatherResult.Success(
                     forecast = forecast,
                     fromCache = true,
@@ -50,7 +57,11 @@ class WeatherRepository @Inject constructor(
             // 캐시 저장
             cache.saveCache(response)
 
-            val forecast = WeatherMapper.mapToTomorrowForecast(response)
+            val forecast = if (targetDate != null) {
+                WeatherMapper.mapToForecast(response, targetDate)
+            } else {
+                WeatherMapper.mapToTomorrowForecast(response)
+            }
             WeatherResult.Success(
                 forecast = forecast,
                 fromCache = false,
@@ -59,7 +70,11 @@ class WeatherRepository @Inject constructor(
         } catch (e: Exception) {
             // API 실패 시 캐시 사용 시도
             cache.getValidCache()?.let { cacheResult ->
-                val forecast = WeatherMapper.mapToTomorrowForecast(cacheResult.response)
+                val forecast = if (targetDate != null) {
+                    WeatherMapper.mapToForecast(cacheResult.response, targetDate)
+                } else {
+                    WeatherMapper.mapToTomorrowForecast(cacheResult.response)
+                }
                 return WeatherResult.SuccessWithWarning(
                     forecast = forecast,
                     warning = "네트워크 오류로 캐시 데이터 사용 중",

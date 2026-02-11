@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import com.umbrella.R
+import com.umbrella.domain.model.PrecipitationType
 import com.umbrella.presentation.main.MainActivity
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -24,8 +25,8 @@ class NotificationHelper @Inject constructor(
 
     companion object {
         const val CHANNEL_ID = "umbrella_rain_alert"
-        const val CHANNEL_NAME = "비 알림"
-        const val CHANNEL_DESCRIPTION = "내일 비 예보가 있을 때 알림을 보냅니다"
+        const val CHANNEL_NAME = "비/눈 알림"
+        const val CHANNEL_DESCRIPTION = "내일 비 또는 눈 예보가 있을 때 알림을 보냅니다"
 
         private const val NOTIFICATION_ID = 1
     }
@@ -55,11 +56,20 @@ class NotificationHelper @Inject constructor(
     }
 
     /**
-     * 비 알림 표시
+     * 강수 알림 표시 (비/눈/혼합)
      */
-    fun showRainNotification(pop: Int): Boolean {
+    fun showRainNotification(
+        pop: Int,
+        precipitationType: PrecipitationType = PrecipitationType.RAIN
+    ): Boolean {
         if (!hasNotificationPermission()) {
             return false
+        }
+
+        val (title, text) = when (precipitationType) {
+            PrecipitationType.RAIN -> "☔ 우산 챙기세요!" to "오늘 비 올 확률 ${pop}%"
+            PrecipitationType.SNOW -> "❄️ 눈이 와요!" to "오늘 눈 올 확률 ${pop}%"
+            PrecipitationType.MIXED -> "🌨️ 비/눈 소식!" to "오늘 비 또는 눈 올 확률 ${pop}%"
         }
 
         val intent = Intent(context, MainActivity::class.java).apply {
@@ -75,8 +85,8 @@ class NotificationHelper @Inject constructor(
 
         val notification = NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_umbrella)
-            .setContentTitle("☔ 우산 챙기세요!")
-            .setContentText("오늘 비 올 확률 ${pop}%")
+            .setContentTitle(title)
+            .setContentText(text)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(pendingIntent)

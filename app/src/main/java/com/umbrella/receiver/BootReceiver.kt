@@ -52,6 +52,10 @@ class BootReceiver : BroadcastReceiver() {
                     val restored = alarmScheduler.restoreAlarmIfNeeded()
                     Log.d(TAG, "Alarm restore result: $restored")
 
+                    // 3. 사전확인 알람 복구
+                    val preCheckRestored = alarmScheduler.restorePreCheckAlarmIfNeeded()
+                    Log.d(TAG, "Pre-check alarm restore result: $preCheckRestored")
+
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in boot receiver", e)
                 }

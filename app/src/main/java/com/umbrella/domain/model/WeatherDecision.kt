@@ -15,7 +15,8 @@ sealed class WeatherDecision {
         val maxPop: Int,
         val location: Location,
         val notificationTime: LocalTime,
-        val fetchedAt: Instant
+        val fetchedAt: Instant,
+        val precipitationType: PrecipitationType = PrecipitationType.RAIN
     ) : WeatherDecision()
 
     /**

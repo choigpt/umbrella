@@ -4,6 +4,7 @@ import android.content.Intent
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.umbrella.data.prefs.PreferencesRepository
+import com.umbrella.data.scheduler.AlarmSchedulerImpl
 import com.umbrella.data.scheduler.NotificationScheduler
 import com.umbrella.domain.model.KoreanCities
 import com.umbrella.domain.model.ManualLocation
@@ -27,6 +28,7 @@ class SettingsViewModel @Inject constructor(
     private val preferencesRepository: PreferencesRepository,
     private val workerScheduler: WorkerScheduler,
     private val notificationScheduler: NotificationScheduler,
+    private val alarmScheduler: AlarmSchedulerImpl,
     private val batteryOptimizationHelper: BatteryOptimizationHelper,
     private val refreshWeatherUseCase: RefreshWeatherUseCase
 ) : ViewModel() {
@@ -68,9 +70,12 @@ class SettingsViewModel @Inject constructor(
 
     fun updateNotificationTime(hour: Int, minute: Int) {
         viewModelScope.launch {
-            preferencesRepository.updateNotificationTime(LocalTime(hour, minute))
+            val newTime = LocalTime(hour, minute)
+            preferencesRepository.updateNotificationTime(newTime)
             // Worker 재스케줄링
             workerScheduler.schedulePeriodicWeatherCheck()
+            // 사전확인 알람 재예약
+            alarmScheduler.schedulePreCheckAlarm(newTime)
             // 즉시 날씨 확인 + 알림 예약 (WorkManager 우회, 바로 실행)
             refreshWeatherUseCase()
         }
@@ -89,9 +94,11 @@ class SettingsViewModel @Inject constructor(
             preferencesRepository.updateEnabled(enabled)
             if (enabled) {
                 workerScheduler.schedulePeriodicWeatherCheck()
+                alarmScheduler.restorePreCheckAlarmIfNeeded()
             } else {
                 workerScheduler.cancelAllWork()
                 notificationScheduler.cancelScheduledNotification()
+                alarmScheduler.cancelPreCheckAlarm()
             }
         }
     }

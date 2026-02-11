@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.edit
 import com.umbrella.data.scheduler.ScheduleInfo
 import com.umbrella.domain.model.AppStatus
 import com.umbrella.domain.model.ManualLocation
+import com.umbrella.domain.model.PrecipitationType
 import com.umbrella.domain.model.StatusInfo
 import com.umbrella.domain.model.UserSettings
 import kotlinx.coroutines.flow.Flow
@@ -209,6 +210,7 @@ class PreferencesRepository @Inject constructor(
             prefs.remove(UserPreferences.SCHEDULED_ALARM_BUFFER_APPLIED)
             prefs.remove(UserPreferences.SCHEDULED_ALARM_BUFFER_MINUTES)
             prefs.remove(UserPreferences.SCHEDULED_ALARM_POP)
+            prefs.remove(UserPreferences.SCHEDULED_PRECIP_TYPE)
 
             // 레거시 키도 삭제
             @Suppress("DEPRECATION")
@@ -293,6 +295,43 @@ class PreferencesRepository @Inject constructor(
         }
     }
 
+    // ==================== 강수 유형 저장 ====================
+
+    suspend fun saveScheduledPrecipType(type: PrecipitationType) {
+        dataStore.edit { prefs ->
+            prefs[UserPreferences.SCHEDULED_PRECIP_TYPE] = type.name
+        }
+    }
+
+    suspend fun getScheduledPrecipType(): PrecipitationType {
+        val prefs = dataStore.data.first()
+        val name = prefs[UserPreferences.SCHEDULED_PRECIP_TYPE] ?: return PrecipitationType.RAIN
+        return try {
+            PrecipitationType.valueOf(name)
+        } catch (_: IllegalArgumentException) {
+            PrecipitationType.RAIN
+        }
+    }
+
+    // ==================== 사전확인 알람 ====================
+
+    suspend fun savePreCheckAlarmTime(millis: Long) {
+        dataStore.edit { prefs ->
+            prefs[UserPreferences.PRE_CHECK_ALARM_TIME] = millis
+        }
+    }
+
+    suspend fun getPreCheckAlarmTime(): Long? {
+        val prefs = dataStore.data.first()
+        return prefs[UserPreferences.PRE_CHECK_ALARM_TIME]
+    }
+
+    suspend fun clearPreCheckAlarmTime() {
+        dataStore.edit { prefs ->
+            prefs.remove(UserPreferences.PRE_CHECK_ALARM_TIME)
+        }
+    }
+
     // ==================== 앱 활성화 상태 ====================
 
     suspend fun isAppEnabled(): Boolean {
@@ -368,6 +407,28 @@ class PreferencesRepository @Inject constructor(
         if (lastUpdate != null) {
             sb.appendLine("마지막 업데이트: ${formatMillis(lastUpdate)}")
         }
+        sb.appendLine()
+
+        // 사전확인 알람
+        sb.appendLine("[사전확인 알람]")
+        val preCheckTime = prefs[UserPreferences.PRE_CHECK_ALARM_TIME]
+        if (preCheckTime != null) {
+            sb.appendLine("예약 시간: ${formatMillis(preCheckTime)}")
+            val now = Clock.System.now().toEpochMilliseconds()
+            if (preCheckTime > now) {
+                val remainMin = (preCheckTime - now) / 60_000
+                sb.appendLine("남은 시간: 약 ${remainMin}분")
+            } else {
+                sb.appendLine("⚠️ 이미 지남")
+            }
+        } else {
+            sb.appendLine("예약 없음")
+        }
+        sb.appendLine()
+
+        // 강수 유형
+        sb.appendLine("[강수 유형]")
+        sb.appendLine("예약된 유형: ${prefs[UserPreferences.SCHEDULED_PRECIP_TYPE] ?: "없음"}")
         sb.appendLine()
 
         // 알림 기록

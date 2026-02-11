@@ -47,7 +47,8 @@ class ScheduleNotificationUseCase @Inject constructor(
     private suspend fun handleRainExpected(decision: WeatherDecision.RainExpected): ScheduleResult {
         val alarmResult = scheduler.scheduleNotification(
             time = decision.notificationTime,
-            pop = decision.maxPop
+            pop = decision.maxPop,
+            precipitationType = decision.precipitationType
         )
 
         return when (alarmResult) {
